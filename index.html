@@ -1,0 +1,985 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>BeachBuy</title>
+<!-- Firebase -->
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+<!-- Leaflet Kaart -->
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap');
+  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+  body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif; background: #f5f5f5; display: flex; justify-content: center; padding: 0; min-height: 100vh; }
+  .app-container { max-width: 420px; width: 100%; min-height: 100vh; background: #fafafa; position: relative; overflow: hidden; }
+  .screen { display: none; } .screen.active { display: block; }
+
+  /* Auth */
+  .auth-screen { min-height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 24px; background: linear-gradient(135deg, #fef3c7 0%, #fde68a 50%, #fcd34d 100%); }
+  .auth-screen .logo { font-size: 64px; margin-bottom: 8px; }
+  .auth-screen h1 { font-size: 28px; font-weight: 600; color: #92400e; margin-bottom: 4px; }
+  .auth-screen .subtitle { font-size: 14px; color: #b45309; margin-bottom: 32px; text-align: center; }
+  .auth-card { background: #fff; border-radius: 16px; padding: 24px; width: 100%; max-width: 340px; box-shadow: 0 4px 20px rgba(0,0,0,0.08); }
+  .auth-card h2 { font-size: 18px; font-weight: 600; color: #111; margin-bottom: 16px; text-align: center; }
+  .form-group { margin-bottom: 14px; }
+  .form-group label { display: block; font-size: 12px; font-weight: 500; color: #666; margin-bottom: 4px; }
+  .form-group input, .form-group select { width: 100%; padding: 10px 12px; border-radius: 10px; border: 1px solid #e5e5e5; font-size: 15px; font-family: inherit; transition: border-color 0.2s; }
+  .form-group input:focus, .form-group select:focus { outline: none; border-color: #92400e; }
+  .btn-primary { background: #111; color: #fff; border: none; border-radius: 10px; padding: 12px 24px; font-size: 15px; font-weight: 500; cursor: pointer; font-family: inherit; width: 100%; transition: opacity 0.15s; }
+  .btn-primary:hover { opacity: 0.9; } .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
+  .btn-secondary { background: #fff; color: #111; border: 1px solid #e5e5e5; border-radius: 10px; padding: 12px 24px; font-size: 15px; font-weight: 500; cursor: pointer; font-family: inherit; width: 100%; margin-top: 8px; display: flex; align-items: center; justify-content: center; gap: 8px; transition: background 0.15s; }
+  .btn-secondary:hover { background: #f5f5f5; }
+  .divider { display: flex; align-items: center; gap: 12px; margin: 16px 0; color: #999; font-size: 12px; }
+  .divider::before, .divider::after { content: ''; flex: 1; height: 1px; background: #e5e5e5; }
+  .auth-switch { text-align: center; margin-top: 16px; font-size: 13px; color: #666; }
+  .auth-switch a { color: #92400e; font-weight: 500; cursor: pointer; text-decoration: none; }
+  .error-msg { color: #ef4444; font-size: 13px; margin-top: 8px; text-align: center; display: none; }
+  .error-msg.show { display: block; }
+  .info-text { font-size: 12px; color: #92400e; background: #fef3c7; padding: 10px; border-radius: 8px; margin-bottom: 14px; text-align: center; }
+
+  /* Header */
+  .app-header { background: linear-gradient(135deg, #fef3c7 0%, #fde68a 50%, #fcd34d 100%); padding: 12px 16px; position: sticky; top: 0; z-index: 10; }
+  .header-top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 4px; }
+  .header-top h1 { font-size: 18px; font-weight: 600; color: #92400e; }
+  .profile-btn { width: 36px; height: 36px; border-radius: 50%; background: rgba(255,255,255,0.7); border: none; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 18px; backdrop-filter: blur(4px); }
+  .shell-balance { display: inline-flex; align-items: center; gap: 6px; background: rgba(255,255,255,0.7); padding: 4px 12px; border-radius: 20px; font-size: 18px; font-weight: 600; color: #92400e; backdrop-filter: blur(4px); }
+  .shell-balance .shell-icon { width: 22px; height: 22px; }
+
+  /* Tabs */
+  .tabs { display: flex; border-bottom: 1px solid #e5e5e5; background: #fff; position: sticky; top: 68px; z-index: 10; }
+  .tab { flex: 1; padding: 8px 2px; text-align: center; font-size: 11px; color: #999; cursor: pointer; border: none; background: none; font-family: inherit; transition: color 0.2s; position: relative; }
+  .tab.active { color: #111; font-weight: 500; }
+  .tab.active::after { content: ''; position: absolute; bottom: 0; left: 20%; right: 20%; height: 2px; background: #111; border-radius: 2px; }
+  .tab svg { width: 18px; height: 18px; display: block; margin: 0 auto 2px; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; fill: none; }
+
+  .content { padding: 12px; padding-bottom: 80px; }
+
+  /* Cards */
+  .card { background: #fff; border-radius: 12px; padding: 14px; margin-bottom: 10px; border: 1px solid #e5e5e5; }
+  .card-title { font-size: 15px; font-weight: 500; color: #111; margin-bottom: 4px; display: flex; align-items: center; gap: 8px; }
+  .card-desc { font-size: 13px; color: #666; line-height: 1.4; }
+
+  /* Shop */
+  .shop-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .shop-item { background: #fff; border: 1px solid #e5e5e5; border-radius: 12px; padding: 12px; text-align: center; cursor: pointer; transition: transform 0.1s; position: relative; }
+  .shop-item:active { transform: scale(0.97); }
+  .shop-item-img { width: 56px; height: 56px; margin: 0 auto 8px; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 28px; }
+  .shop-item-name { font-size: 13px; font-weight: 500; color: #111; margin-bottom: 2px; }
+  .shop-item-price { font-size: 12px; color: #666; display: flex; align-items: center; justify-content: center; gap: 3px; }
+  .shop-item-stock { font-size: 11px; color: #999; margin-top: 4px; }
+  .shop-item .delete-btn { position: absolute; top: 6px; right: 6px; width: 22px; height: 22px; border-radius: 50%; background: #fee2e2; color: #ef4444; border: none; font-size: 12px; cursor: pointer; display: none; align-items: center; justify-content: center; }
+  .shop-item:hover .delete-btn { display: flex; }
+  .add-flower-btn { width: 100%; padding: 12px; border-radius: 10px; border: 1px dashed #ccc; background: #fff; font-size: 14px; font-weight: 500; color: #666; cursor: pointer; font-family: inherit; display: flex; align-items: center; justify-content: center; gap: 6px; margin-top: 10px; transition: background 0.15s; }
+  .add-flower-btn:hover { background: #f5f5f5; }
+
+  /* Buy/Sellers */
+  .seller-card { background: #fff; border: 1px solid #e5e5e5; border-radius: 12px; padding: 14px; margin-bottom: 10px; cursor: pointer; transition: transform 0.1s; }
+  .seller-card:active { transform: scale(0.98); }
+  .seller-header { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+  .seller-avatar { width: 40px; height: 40px; border-radius: 50%; background: #fef3c7; display: flex; align-items: center; justify-content: center; font-size: 18px; font-weight: 600; color: #92400e; }
+  .seller-info { flex: 1; }
+  .seller-name { font-size: 14px; font-weight: 500; color: #111; }
+  .seller-location { font-size: 12px; color: #666; }
+  .seller-status { font-size: 11px; padding: 2px 8px; border-radius: 10px; display: inline-block; margin-top: 2px; }
+  .status-open { background: #dcfce7; color: #166534; }
+  .status-paused { background: #fef9c3; color: #854d0e; }
+  .seller-flowers { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px; }
+  .seller-flower-tag { background: #f5f5f5; padding: 4px 10px; border-radius: 8px; font-size: 12px; color: #555; }
+
+  /* Buy Modal */
+  .buy-flower-item { display: flex; align-items: center; gap: 12px; padding: 12px; background: #fafafa; border-radius: 10px; margin-bottom: 8px; }
+  .buy-flower-emoji { font-size: 28px; width: 48px; height: 48px; display: flex; align-items: center; justify-content: center; background: #fff; border-radius: 8px; }
+  .buy-flower-info { flex: 1; }
+  .buy-flower-name { font-size: 14px; font-weight: 500; }
+  .buy-flower-price { font-size: 13px; color: #92400e; font-weight: 500; }
+  .buy-flower-stock { font-size: 11px; color: #999; }
+  .buy-btn { background: #111; color: #fff; border: none; border-radius: 8px; padding: 8px 16px; font-size: 13px; font-weight: 500; cursor: pointer; }
+  .buy-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+  .buy-btn.out-of-stock { background: #ccc; }
+
+  /* Kaart */
+  #map-container { width: 100%; height: 60vh; border-radius: 12px; border: 1px solid #e5e5e5; overflow: hidden; margin-bottom: 12px; }
+  .map-overlay { position: absolute; bottom: 20px; left: 12px; right: 12px; z-index: 500; display: flex; gap: 8px; }
+  .map-overlay button { flex: 1; padding: 10px; border-radius: 10px; border: none; font-size: 13px; font-weight: 500; cursor: pointer; font-family: inherit; }
+  .map-btn-primary { background: #111; color: #fff; }
+  .map-btn-secondary { background: #fff; color: #111; border: 1px solid #e5e5e5 !important; }
+  .beach-badge { display: inline-block; padding: 4px 10px; border-radius: 12px; font-size: 11px; font-weight: 500; background: #dbeafe; color: #1e40af; margin: 2px; cursor: pointer; }
+  .beach-badge.active { background: #fcd34d; color: #92400e; }
+  .map-legend { display: flex; gap: 12px; font-size: 12px; color: #666; margin-bottom: 8px; }
+  .map-legend span { display: flex; align-items: center; gap: 4px; }
+  .legend-dot { width: 10px; height: 10px; border-radius: 50%; }
+  .dot-open { background: #22c55e; }
+  .dot-paused { background: #eab308; }
+  .dot-me { background: #3b82f6; }
+
+  /* Log */
+  .history-item { display: flex; align-items: center; gap: 10px; padding: 10px 0; border-bottom: 1px solid #e5e5e5; }
+  .history-item:last-child { border-bottom: none; }
+  .history-icon { width: 32px; height: 32px; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 16px; flex-shrink: 0; }
+  .history-text { flex: 1; }
+  .history-title { font-size: 13px; font-weight: 500; }
+  .history-time { font-size: 11px; color: #999; }
+  .history-amount { font-size: 14px; font-weight: 500; }
+  .history-amount.positive { color: #16a34a; }
+  .history-amount.negative { color: #ef4444; }
+
+  /* Profile */
+  .profile-header { background: linear-gradient(135deg, #fef3c7 0%, #fde68a 50%, #fcd34d 100%); padding: 24px 16px; text-align: center; }
+  .profile-avatar { width: 72px; height: 72px; border-radius: 50%; background: #fff; margin: 0 auto 12px; display: flex; align-items: center; justify-content: center; font-size: 36px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
+  .profile-name { font-size: 18px; font-weight: 600; color: #92400e; }
+  .profile-email { font-size: 13px; color: #b45309; margin-top: 2px; }
+  .profile-stats { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; padding: 16px; }
+  .stat-box { background: #fff; border: 1px solid #e5e5e5; border-radius: 10px; padding: 12px; text-align: center; }
+  .stat-value { font-size: 20px; font-weight: 600; color: #111; }
+  .stat-label { font-size: 11px; color: #999; margin-top: 2px; }
+  .profile-menu { padding: 0 16px 16px; }
+  .menu-item { display: flex; align-items: center; gap: 12px; padding: 14px; background: #fff; border: 1px solid #e5e5e5; border-radius: 10px; margin-bottom: 8px; cursor: pointer; transition: background 0.15s; }
+  .menu-item:hover { background: #f5f5f5; }
+  .menu-item-icon { width: 36px; height: 36px; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 18px; background: #fef3c7; }
+  .menu-item-text { flex: 1; font-size: 14px; font-weight: 500; color: #111; }
+  .menu-item-arrow { color: #999; font-size: 18px; }
+
+  /* Shell editor in profile */
+  .shell-editor { display: flex; align-items: center; gap: 8px; margin-top: 8px; }
+  .shell-editor input { flex: 1; padding: 8px 12px; border: 1px solid #e5e5e5; border-radius: 8px; font-size: 14px; text-align: center; }
+  .shell-editor button { padding: 8px 16px; background: #111; color: #fff; border: none; border-radius: 8px; font-size: 13px; cursor: pointer; }
+
+  /* Toast & Modal & Loading */
+  .toast { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%) translateY(20px); background: #111; color: #fff; padding: 10px 18px; border-radius: 20px; font-size: 13px; font-weight: 500; opacity: 0; transition: opacity 0.3s, transform 0.3s; pointer-events: none; z-index: 1000; white-space: nowrap; }
+  .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+  .modal-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.4); display: none; align-items: center; justify-content: center; z-index: 40; padding: 20px; }
+  .modal-overlay.show { display: flex; }
+  .modal-card { background: #fff; border-radius: 16px; padding: 20px; width: 100%; max-width: 320px; animation: popIn 0.25s ease-out; max-height: 80vh; overflow-y: auto; }
+  @keyframes popIn { from { transform: scale(0.9); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+  .modal-card h3 { font-size: 16px; font-weight: 600; margin-bottom: 16px; text-align: center; }
+  .loading-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(255,255,255,0.9); display: none; align-items: center; justify-content: center; z-index: 200; flex-direction: column; gap: 12px; }
+  .loading-overlay.show { display: flex; }
+  .spinner { width: 40px; height: 40px; border: 3px solid #e5e5e5; border-top-color: #92400e; border-radius: 50%; animation: spin 0.8s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .loading-text { font-size: 14px; color: #666; }
+  .empty-state { text-align: center; padding: 40px 0; color: #999; font-size: 13px; }
+  .empty-state svg { margin-bottom: 12px; opacity: 0.4; }
+  .back-btn { display: flex; align-items: center; gap: 6px; padding: 8px 0; background: none; border: none; font-size: 14px; color: #92400e; font-weight: 500; cursor: pointer; font-family: inherit; margin-bottom: 8px; }
+
+  /* Leaflet popup styling */
+  .leaflet-popup-content-wrapper { border-radius: 12px; padding: 0; }
+  .leaflet-popup-content { margin: 10px 14px; font-family: Inter, sans-serif; }
+  .popup-title { font-weight: 600; font-size: 14px; margin-bottom: 2px; }
+  .popup-status { font-size: 12px; color: #666; }
+  .popup-shells { font-size: 13px; font-weight: 500; color: #92400e; margin-top: 4px; }
+</style>
+</head>
+<body>
+<div class="app-container" id="app">
+  <!-- LOGIN -->
+  <div id="login-screen" class="auth-screen screen active">
+    <div class="logo">🐚</div>
+    <h1>BeachBuy</h1>
+    <p class="subtitle">Jouw digitale strandbloemenmarkt</p>
+    <div class="auth-card">
+      <h2>Inloggen</h2>
+      <div class="form-group"><label>E-mailadres</label><input type="email" id="login-email" placeholder="jouw@email.com"></div>
+      <div class="form-group"><label>Wachtwoord</label><input type="password" id="login-password" placeholder="••••••••"></div>
+      <button class="btn-primary" onclick="loginEmail()">Inloggen</button>
+      <div class="error-msg" id="login-error"></div>
+      <div class="auth-switch">Nog geen account? <a onclick="showScreen('register-screen')">Registreren</a></div>
+    </div>
+  </div>
+
+  <!-- REGISTER -->
+  <div id="register-screen" class="auth-screen screen">
+    <div class="logo">🐚</div>
+    <h1>BeachBuy</h1>
+    <p class="subtitle">Maak je account aan</p>
+    <div class="auth-card">
+      <h2>Registreren</h2>
+      <div class="info-text">💡 Bij BeachBuy betaal je op het strand met fysieke schelpen. Voer hier in hoeveel je nu hebt!</div>
+      <div class="form-group"><label>Weergavenaam</label><input type="text" id="reg-name" placeholder="Bijv. Emma"></div>
+      <div class="form-group"><label>E-mailadres</label><input type="email" id="reg-email" placeholder="jouw@email.com"></div>
+      <div class="form-group"><label>Wachtwoord</label><input type="password" id="reg-password" placeholder="Minimaal 6 tekens"></div>
+      <div class="form-group"><label>Hoeveel schelpen heb je nu?</label><input type="number" id="reg-shells" value="0" min="0"></div>
+      <button class="btn-primary" onclick="registerEmail()">Account aanmaken</button>
+      <div class="error-msg" id="reg-error"></div>
+      <div class="auth-switch">Al een account? <a onclick="showScreen('login-screen')">Inloggen</a></div>
+    </div>
+  </div>
+
+  <!-- MAIN APP -->
+  <div id="main-app" style="display:none;">
+    <div class="app-header">
+      <div class="header-top">
+        <h1>🐚 BeachBuy</h1>
+        <button class="profile-btn" onclick="showProfile()">👤</button>
+      </div>
+      <div class="shell-balance">
+        <svg class="shell-icon" viewBox="0 0 24 24" fill="none" stroke="#92400e" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M12 2C7.5 2 4 6 4 10c0 3.5 2 6 4 8 1.5 1.5 2.5 3 4 3s2.5-1.5 4-3c2-2 4-4.5 4-8 0-4-3.5-8-8-8z"/>
+          <path d="M8 10c0-2 1.5-3.5 4-3.5s4 1.5 4 3.5"/><path d="M9 14c.5.5 1.5 1 3 1s2.5-.5 3-1"/>
+        </svg>
+        <span id="total-shells">0</span>
+      </div>
+    </div>
+    <div class="tabs">
+      <button class="tab active" onclick="switchTab('buy')">
+        <svg viewBox="0 0 24 24"><path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 0 1-8 0"/></svg>Kopen
+      </button>
+      <button class="tab" onclick="switchTab('shop')">
+        <svg viewBox="0 0 24 24"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg>Mijn winkel
+      </button>
+      <button class="tab" onclick="switchTab('map')">
+        <svg viewBox="0 0 24 24"><polygon points="1 6 1 22 8 18 16 22 21 18 21 2 16 6 8 2 1 6"/><line x1="8" y1="2" x2="8" y2="18"/><line x1="16" y1="6" x2="16" y2="22"/></svg>Kaart
+      </button>
+      <button class="tab" onclick="switchTab('log')">
+        <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>Logboek
+      </button>
+    </div>
+
+    <div class="content">
+      <!-- BUY - Browse other sellers -->
+      <div id="buy" class="screen active">
+        <h3 style="font-size:14px;font-weight:500;margin-bottom:10px;color:#111;">🛍️ Verkopers op het strand</h3>
+        <div id="sellers-list">
+          <div class="empty-state"><div style="font-size:32px;margin-bottom:8px;">🏖️</div><div>Nog geen verkopers zichtbaar</div></div>
+        </div>
+      </div>
+
+      <!-- SHOP - My flowers for sale -->
+      <div id="shop" class="screen">
+        <h3 style="font-size:14px;font-weight:500;margin-bottom:10px;color:#111;">🌸 Mijn bloemen te koop</h3>
+        <div class="shop-grid" id="shop-grid"></div>
+        <button class="add-flower-btn" onclick="showAddFlower()">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>Nieuwe bloem toevoegen
+        </button>
+      </div>
+
+      <!-- KAART -->
+      <div id="map" class="screen">
+        <div style="margin-bottom:8px;">
+          <div style="font-size:14px;font-weight:500;color:#111;margin-bottom:6px;">🏖️ Belgische Kust</div>
+          <div style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:8px;" id="beach-filters">
+            <span class="beach-badge active" onclick="focusBeach('all')">Hele kust</span>
+            <span class="beach-badge" onclick="focusBeach('panne')">De Panne</span>
+            <span class="beach-badge" onclick="focusBeach('koksijde')">Koksijde</span>
+            <span class="beach-badge" onclick="focusBeach('nieuwpoort')">Nieuwpoort</span>
+            <span class="beach-badge" onclick="focusBeach('oostende')">Oostende</span>
+            <span class="beach-badge" onclick="focusBeach('blankenberge')">Blankenberge</span>
+            <span class="beach-badge" onclick="focusBeach('knokke')">Knokke</span>
+          </div>
+          <div class="map-legend">
+            <span><span class="legend-dot dot-open"></span> Open</span>
+            <span><span class="legend-dot dot-paused"></span> Pauze</span>
+            <span><span class="legend-dot dot-me"></span> Jij</span>
+          </div>
+        </div>
+        <div id="map-container"></div>
+        <div class="card" style="margin-top:10px;">
+          <div class="card-title">📍 Mijn winkel</div>
+          <div class="card-desc" id="my-shop-info">
+            Je hebt nog geen winkel op de kaart gezet. Tik op de kaart of gebruik je GPS!
+          </div>
+          <div style="display:flex;gap:8px;margin-top:10px;">
+            <button class="btn-primary" style="flex:1;font-size:13px;padding:8px;" onclick="useGPS()">📡 GPS</button>
+            <button class="btn-secondary" style="flex:1;font-size:13px;padding:8px;" onclick="setShopStatus('open')">🟢 Open</button>
+            <button class="btn-secondary" style="flex:1;font-size:13px;padding:8px;" onclick="setShopStatus('paused')">🟡 Pauze</button>
+            <button class="btn-secondary" style="flex:1;font-size:13px;padding:8px;" onclick="setShopStatus('closed')">🔴 Dicht</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- LOG -->
+      <div id="log" class="screen">
+        <h3 style="font-size:14px;font-weight:500;margin-bottom:10px;color:#111;">📋 Logboek</h3>
+        <div id="log-list">
+          <div class="empty-state"><svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg><div>Nog geen transacties genoteerd</div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- PROFILE -->
+  <div id="profile-screen" style="display:none;">
+    <div class="profile-header">
+      <button class="back-btn" onclick="hideProfile()"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg>Terug</button>
+      <div class="profile-avatar" id="profile-avatar">👤</div>
+      <div class="profile-name" id="profile-name">Gebruiker</div>
+      <div class="profile-email" id="profile-email">email@voorbeeld.com</div>
+    </div>
+    <div class="profile-stats">
+      <div class="stat-box"><div class="stat-value" id="stat-shells">0</div><div class="stat-label">Schelpen</div></div>
+      <div class="stat-box"><div class="stat-value" id="stat-flowers">0</div><div class="stat-label">Bloemen</div></div>
+      <div class="stat-box"><div class="stat-value" id="stat-sales">0</div><div class="stat-label">Verkopen</div></div>
+    </div>
+    <div class="profile-menu">
+      <div class="menu-item" onclick="showEditName()">
+        <div class="menu-item-icon">✏️</div>
+        <div class="menu-item-text">Naam wijzigen</div>
+        <div class="menu-item-arrow">›</div>
+      </div>
+      <div class="menu-item" onclick="showEditLocation()">
+        <div class="menu-item-icon">📍</div>
+        <div class="menu-item-text">Locatie instellen</div>
+        <div class="menu-item-arrow">›</div>
+      </div>
+      <div class="menu-item" onclick="showEditShells()">
+        <div class="menu-item-icon">🐚</div>
+        <div class="menu-item-text">Schelpen aanpassen</div>
+        <div class="menu-item-arrow">›</div>
+      </div>
+      <div class="menu-item" onclick="logout()">
+        <div class="menu-item-icon" style="background:#fee2e2;">🚪</div>
+        <div class="menu-item-text" style="color:#ef4444;">Uitloggen</div>
+        <div class="menu-item-arrow">›</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODALS -->
+  <div class="modal-overlay" id="add-flower-modal">
+    <div class="modal-card">
+      <h3>Nieuwe bloem toevoegen</h3>
+      <div class="form-group"><label>Naam van de bloem</label><input type="text" id="flower-name" placeholder="Bijv. De Roze Supernova"></div>
+      <div class="form-group"><label>Prijs in schelpen</label><input type="number" id="flower-price" value="5" min="1"></div>
+      <div class="form-group"><label>Aantal op voorraad</label><input type="number" id="flower-stock" value="1" min="1"></div>
+      <div class="form-group"><label>Emoji / Icoon</label><input type="text" id="flower-emoji" value="🌸" maxlength="2"></div>
+      <div class="form-group"><label>Kleur</label>
+        <select id="flower-color"><option value="#fce7f3">Roze</option><option value="#fef9c3">Geel</option><option value="#dbeafe">Blauw</option><option value="#f3e8ff">Paars</option><option value="#dcfce7">Groen</option><option value="#fee2e2">Rood</option><option value="#ffedd5">Oranje</option></select>
+      </div>
+      <button class="btn-primary" onclick="confirmAddFlower()">Toevoegen</button>
+      <button class="btn-secondary" onclick="closeModal('add-flower-modal')">Annuleren</button>
+    </div>
+  </div>
+
+  <div class="modal-overlay" id="buy-modal">
+    <div class="modal-card">
+      <h3 id="buy-seller-name">Bloemen kopen</h3>
+      <div id="buy-flowers-list"></div>
+      <button class="btn-secondary" onclick="closeModal('buy-modal')">Sluiten</button>
+    </div>
+  </div>
+
+  <div class="modal-overlay" id="edit-name-modal">
+    <div class="modal-card">
+      <h3>Naam wijzigen</h3>
+      <div class="form-group"><label>Nieuwe weergavenaam</label><input type="text" id="new-display-name" placeholder="Jouw naam"></div>
+      <button class="btn-primary" onclick="confirmEditName()">Opslaan</button>
+      <button class="btn-secondary" onclick="closeModal('edit-name-modal')">Annuleren</button>
+    </div>
+  </div>
+
+  <div class="modal-overlay" id="edit-location-modal">
+    <div class="modal-card">
+      <h3>Locatie instellen</h3>
+      <div class="form-group"><label>Strand / Plaats</label><input type="text" id="location-place" placeholder="Bijv. Koksijde"></div>
+      <div class="form-group"><label>Strandpost / Referentie</label><input type="text" id="location-ref" placeholder="Bijv. Strandpost 3"></div>
+      <button class="btn-primary" onclick="confirmEditLocation()">Opslaan</button>
+      <button class="btn-secondary" onclick="closeModal('edit-location-modal')">Annuleren</button>
+    </div>
+  </div>
+
+  <div class="modal-overlay" id="edit-shells-modal">
+    <div class="modal-card">
+      <h3>🐚 Schelpen aanpassen</h3>
+      <p style="font-size:13px;color:#666;margin-bottom:12px;text-align:center;">Tel je fysieke schelpen en voer het juiste aantal in.</p>
+      <div class="form-group"><label>Huidig aantal schelpen</label><input type="number" id="new-shells-count" value="0" min="0"></div>
+      <button class="btn-primary" onclick="confirmEditShells()">Opslaan</button>
+      <button class="btn-secondary" onclick="closeModal('edit-shells-modal')">Annuleren</button>
+    </div>
+  </div>
+
+  <div class="toast" id="toast"></div>
+  <div class="loading-overlay" id="loading"><div class="spinner"></div><div class="loading-text">Even geduld...</div></div>
+</div>
+
+<script>
+// ===================== FIREBASE CONFIG =====================
+const firebaseConfig = {
+  apiKey: "AIzaSyA8e6IumPc0D3QYZNxYkfgovL_Kemrot38",
+  authDomain: "beachbuy-c56f0.firebaseapp.com",
+  projectId: "beachbuy-c56f0",
+  storageBucket: "beachbuy-c56f0.firebasestorage.app",
+  messagingSenderId: "277625608946",
+  appId: "1:277625608946:web:83f9f56cb4120dbe218e6b",
+  measurementId: "G-SJ2BNDQERP"
+};
+
+firebase.initializeApp(firebaseConfig);
+const auth = firebase.auth();
+const db = firebase.firestore();
+
+// ===================== GLOBAL STATE =====================
+let currentUser = null;
+let userData = null;
+let myFlowers = [];
+let allSellers = [];
+let transactions = [];
+let map = null;
+let userMarker = null;
+let shopMarkers = [];
+let currentBuySeller = null;
+let unsubUser = null;
+let unsubFlowers = null;
+let unsubSellers = null;
+let unsubTrans = null;
+
+// ===================== UTILITIES =====================
+function showLoading(show) { document.getElementById('loading').classList.toggle('show', show); }
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2500);
+}
+function showError(id, msg) { const el = document.getElementById(id); el.textContent = msg; el.classList.add('show'); }
+function hideError(id) { document.getElementById(id).classList.remove('show'); }
+function closeModal(id) { document.getElementById(id).classList.remove('show'); }
+function genId() { return 'id_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2,7); }
+function escapeHtml(t) { const d = document.createElement('div'); d.textContent = t; return d.innerHTML; }
+
+function showScreen(id) {
+  document.querySelectorAll('.auth-screen').forEach(s => s.classList.remove('active'));
+  const el = document.getElementById(id);
+  if (el) el.classList.add('active');
+}
+
+// ===================== AUTH =====================
+function loginEmail() {
+  hideError('login-error');
+  const email = document.getElementById('login-email').value.trim();
+  const pw = document.getElementById('login-password').value;
+  if (!email || !pw) { showError('login-error', 'Vul e-mail en wachtwoord in'); return; }
+  showLoading(true);
+  auth.signInWithEmailAndPassword(email, pw).catch(err => {
+    showLoading(false);
+    let m = 'Inloggen mislukt';
+    if (err.code === 'auth/user-not-found') m = 'Geen account gevonden';
+    else if (err.code === 'auth/wrong-password') m = 'Onjuist wachtwoord';
+    else if (err.code === 'auth/invalid-credential') m = 'Onjuist e-mailadres of wachtwoord';
+    showError('login-error', m);
+  });
+}
+
+function registerEmail() {
+  hideError('reg-error');
+  const name = document.getElementById('reg-name').value.trim();
+  const email = document.getElementById('reg-email').value.trim();
+  const pw = document.getElementById('reg-password').value;
+  const shells = parseInt(document.getElementById('reg-shells').value) || 0;
+
+  if (!name) { showError('reg-error', 'Vul een weergavenaam in'); return; }
+  if (!email) { showError('reg-error', 'Vul een e-mailadres in'); return; }
+  if (pw.length < 6) { showError('reg-error', 'Wachtwoord moet minimaal 6 tekens zijn'); return; }
+  if (shells < 0) { showError('reg-error', 'Schelpen kunnen niet negatief zijn'); return; }
+
+  showLoading(true);
+  auth.createUserWithEmailAndPassword(email, pw)
+    .then(cred => cred.user.updateProfile({ displayName: name }).then(() => cred))
+    .then(cred => {
+      return db.collection('users').doc(cred.user.uid).set({
+        name, email, shells,
+        location: { place: '', ref: '', lat: null, lng: null },
+        status: 'closed',
+        createdAt: firebase.firestore.FieldValue.serverTimestamp()
+      });
+    })
+    .then(() => showLoading(false))
+    .catch(err => {
+      showLoading(false);
+      let m = 'Registreren mislukt';
+      if (err.code === 'auth/email-already-in-use') m = 'Dit e-mailadres is al in gebruik';
+      else if (err.code === 'auth/invalid-email') m = 'Ongeldig e-mailadres';
+      showError('reg-error', m);
+    });
+}
+
+function logout() {
+  showLoading(true);
+  auth.signOut().then(() => location.reload());
+}
+
+// ===================== APP INIT =====================
+auth.onAuthStateChanged(user => {
+  showLoading(false);
+  if (user) {
+    currentUser = user;
+    document.getElementById('login-screen').classList.remove('active');
+    document.getElementById('register-screen').classList.remove('active');
+    document.getElementById('main-app').style.display = 'block';
+    initApp();
+  } else {
+    currentUser = null;
+    document.getElementById('main-app').style.display = 'none';
+    document.getElementById('profile-screen').style.display = 'none';
+    showScreen('login-screen');
+  }
+});
+
+function initApp() {
+  // Subscribe to my user data
+  unsubUser = db.collection('users').doc(currentUser.uid).onSnapshot(doc => {
+    if (doc.exists) { userData = doc.data(); updateUI(); }
+  });
+
+  // Subscribe to my flowers
+  unsubFlowers = db.collection('users').doc(currentUser.uid).collection('flowers')
+    .orderBy('createdAt', 'desc').onSnapshot(snap => {
+      myFlowers = [];
+      snap.forEach(d => myFlowers.push({ id: d.id, ...d.data() }));
+      renderMyFlowers();
+      updateStats();
+    });
+
+  // Subscribe to all sellers (for buying)
+  unsubSellers = db.collection('users').where('status', 'in', ['open', 'paused'])
+    .onSnapshot(snap => {
+      allSellers = [];
+      snap.forEach(d => {
+        if (d.id !== currentUser.uid) allSellers.push({ id: d.id, ...d.data() });
+      });
+      renderSellers();
+      updateShopMarkers();
+    });
+
+  // Subscribe to my transactions
+  unsubTrans = db.collection('users').doc(currentUser.uid).collection('transactions')
+    .orderBy('timestamp', 'desc').onSnapshot(snap => {
+      transactions = [];
+      snap.forEach(d => transactions.push({ id: d.id, ...d.data() }));
+      renderTransactions();
+      updateStats();
+    });
+
+  setTimeout(initMap, 300);
+}
+
+function updateUI() {
+  if (!userData) return;
+  const shells = userData.shells || 0;
+  document.getElementById('total-shells').textContent = shells;
+  document.getElementById('stat-shells').textContent = shells;
+  document.getElementById('profile-name').textContent = userData.name || currentUser.displayName || 'Gebruiker';
+  document.getElementById('profile-email').textContent = currentUser.email;
+  document.getElementById('profile-avatar').textContent = (userData.name || 'G').charAt(0).toUpperCase();
+
+  const loc = userData.location || {};
+  const status = userData.status || 'closed';
+  const em = status === 'open' ? '🟢' : status === 'paused' ? '🟡' : '🔴';
+  let txt = `${em} ${status === 'open' ? 'Open' : status === 'paused' ? 'Pauze' : 'Gesloten'}`;
+  if (loc.place) txt += ` — ${loc.place}`;
+  if (loc.ref) txt += ` (${loc.ref})`;
+  if (!loc.place && !loc.ref) txt += ' — Geen locatie ingesteld';
+  document.getElementById('my-shop-info').textContent = txt;
+}
+
+function updateStats() {
+  document.getElementById('stat-flowers').textContent = myFlowers.length;
+  document.getElementById('stat-sales').textContent = transactions.filter(t => t.type === 'sale').length;
+}
+
+// ===================== TABS =====================
+function switchTab(name) {
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.content .screen').forEach(s => s.classList.remove('active'));
+  event.currentTarget.classList.add('active');
+  document.getElementById(name).classList.add('active');
+  if (name === 'map' && map) setTimeout(() => map.invalidateSize(), 200);
+}
+
+// ===================== BUY (other sellers) =====================
+function renderSellers() {
+  const list = document.getElementById('sellers-list');
+  if (allSellers.length === 0) {
+    list.innerHTML = '<div class="empty-state"><div style="font-size:32px;margin-bottom:8px;">🏖️</div><div>Nog geen verkopers zichtbaar</div><div style="font-size:12px;margin-top:8px;">Andere gebruikers moeten hun winkel open zetten</div></div>';
+    return;
+  }
+
+  list.innerHTML = allSellers.map(s => {
+    const loc = s.location || {};
+    const status = s.status || 'closed';
+    const statusClass = status === 'open' ? 'status-open' : 'status-paused';
+    const statusText = status === 'open' ? 'Open' : 'Pauze';
+    const flowers = s.flowers || [];
+    const flowerTags = flowers.slice(0, 3).map(f => `<span class="seller-flower-tag">${f.emoji || '🌸'} ${f.price}</span>`).join('');
+    const more = flowers.length > 3 ? `<span class="seller-flower-tag">+${flowers.length - 3}</span>` : '';
+
+    return `
+      <div class="seller-card" onclick="openBuyModal('${s.id}')">
+        <div class="seller-header">
+          <div class="seller-avatar">${(s.name || 'V').charAt(0).toUpperCase()}</div>
+          <div class="seller-info">
+            <div class="seller-name">${escapeHtml(s.name || 'Verkoper')}</div>
+            <div class="seller-location">${escapeHtml(loc.place || '')} ${escapeHtml(loc.ref || '')}</div>
+            <span class="seller-status ${statusClass}">${statusText}</span>
+          </div>
+        </div>
+        <div class="seller-flowers">${flowerTags}${more}</div>
+      </div>
+    `;
+  }).join('');
+}
+
+function openBuyModal(sellerId) {
+  const seller = allSellers.find(s => s.id === sellerId);
+  if (!seller) return;
+  currentBuySeller = seller;
+
+  document.getElementById('buy-seller-name').textContent = `🛒 Bloemen van ${escapeHtml(seller.name || 'Verkoper')}`;
+
+  const flowers = seller.flowers || [];
+  const list = document.getElementById('buy-flowers-list');
+
+  if (flowers.length === 0) {
+    list.innerHTML = '<div class="empty-state" style="padding:20px 0;">Deze verkoper heeft geen bloemen te koop.</div>';
+  } else {
+    list.innerHTML = flowers.map(f => {
+      const outOfStock = (f.stock || 0) <= 0;
+      const canAfford = (userData?.shells || 0) >= (f.price || 0);
+      const disabled = outOfStock || !canAfford;
+
+      return `
+        <div class="buy-flower-item">
+          <div class="buy-flower-emoji" style="background:${f.color || '#fce7f3'};">${f.emoji || '🌸'}</div>
+          <div class="buy-flower-info">
+            <div class="buy-flower-name">${escapeHtml(f.name)}</div>
+            <div class="buy-flower-price">${f.price} 🐚 ${outOfStock ? '(uitverkocht)' : canAfford ? '' : '(te duur)'}</div>
+            <div class="buy-flower-stock">${f.stock || 0} op voorraad</div>
+          </div>
+          <button class="buy-btn ${outOfStock ? 'out-of-stock' : ''}" ${disabled ? 'disabled' : ''} onclick="buyFlower('${f.id}', ${f.price})">Koop</button>
+        </div>
+      `;
+    }).join('');
+  }
+
+  document.getElementById('buy-modal').classList.add('show');
+}
+
+function buyFlower(flowerId, price) {
+  if (!currentBuySeller || !userData) return;
+  const seller = currentBuySeller;
+  const flower = (seller.flowers || []).find(f => f.id === flowerId);
+  if (!flower) return;
+
+  if ((userData.shells || 0) < price) {
+    showToast('Je hebt niet genoeg schelpen!');
+    return;
+  }
+  if ((flower.stock || 0) <= 0) {
+    showToast('Deze bloem is uitverkocht!');
+    return;
+  }
+
+  showLoading(true);
+
+  // Update seller's flower stock
+  const sellerFlowers = (seller.flowers || []).map(f => {
+    if (f.id === flowerId) return { ...f, stock: (f.stock || 0) - 1 };
+    return f;
+  });
+
+  // Update my shells (decrease)
+  const myNewShells = (userData.shells || 0) - price;
+
+  // Batch write
+  const batch = db.batch();
+
+  // Update seller's flowers
+  batch.update(db.collection('users').doc(seller.id), { flowers: sellerFlowers });
+
+  // Update my shells
+  batch.update(db.collection('users').doc(currentUser.uid), { shells: myNewShells });
+
+  // Add transaction for me (purchase)
+  const myTransRef = db.collection('users').doc(currentUser.uid).collection('transactions').doc();
+  batch.set(myTransRef, {
+    type: 'purchase',
+    flowerName: flower.name,
+    flowerEmoji: flower.emoji || '🌸',
+    amount: -price,
+    sellerName: seller.name,
+    timestamp: firebase.firestore.FieldValue.serverTimestamp()
+  });
+
+  // Add transaction for seller (sale)
+  const sellerTransRef = db.collection('users').doc(seller.id).collection('transactions').doc();
+  batch.set(sellerTransRef, {
+    type: 'sale',
+    flowerName: flower.name,
+    flowerEmoji: flower.emoji || '🌸',
+    amount: price,
+    buyerName: userData.name,
+    timestamp: firebase.firestore.FieldValue.serverTimestamp()
+  });
+
+  batch.commit()
+    .then(() => {
+      showLoading(false);
+      closeModal('buy-modal');
+      showToast(`Je kocht ${flower.name} voor ${price} schelpen!`);
+      currentBuySeller = null;
+    })
+    .catch(err => {
+      showLoading(false);
+      showToast('Aankoop mislukt: ' + err.message);
+    });
+}
+
+// ===================== SHOP (my flowers) =====================
+function renderMyFlowers() {
+  const grid = document.getElementById('shop-grid');
+  if (myFlowers.length === 0) {
+    grid.innerHTML = '<div class="empty-state" style="grid-column:1/-1;padding:30px 0;"><div style="font-size:32px;margin-bottom:8px;">🌸</div><div>Geen bloemen te koop</div><div style="font-size:12px;margin-top:8px;">Voeg bloemen toe die je wilt verkopen</div></div>';
+    return;
+  }
+
+  grid.innerHTML = myFlowers.map(f => `
+    <div class="shop-item">
+      <button class="delete-btn" onclick="event.stopPropagation();deleteFlower('${f.id}')">×</button>
+      <div class="shop-item-img" style="background:${f.color || '#fce7f3'};">${f.emoji || '🌸'}</div>
+      <div class="shop-item-name">${escapeHtml(f.name)}</div>
+      <div class="shop-item-price">${f.price} <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2C7.5 2 4 6 4 10c0 3.5 2 6 4 8 1.5 1.5 2.5 3 4 3s2.5-1.5 4-3c2-2 4-4.5 4-8 0-4-3.5-8-8-8z"/></svg></div>
+      <div class="shop-item-stock">${f.stock} op voorraad</div>
+    </div>
+  `).join('');
+}
+
+function showAddFlower() {
+  document.getElementById('flower-name').value = '';
+  document.getElementById('flower-price').value = '5';
+  document.getElementById('flower-stock').value = '1';
+  document.getElementById('flower-emoji').value = '🌸';
+  document.getElementById('flower-color').value = '#fce7f3';
+  document.getElementById('add-flower-modal').classList.add('show');
+}
+
+function confirmAddFlower() {
+  const name = document.getElementById('flower-name').value.trim();
+  const price = parseInt(document.getElementById('flower-price').value);
+  const stock = parseInt(document.getElementById('flower-stock').value);
+  const emoji = document.getElementById('flower-emoji').value.trim() || '🌸';
+  const color = document.getElementById('flower-color').value;
+
+  if (!name) { showToast('Vul een naam in'); return; }
+  if (isNaN(price) || price < 1) { showToast('Prijs moet minimaal 1 zijn'); return; }
+  if (isNaN(stock) || stock < 1) { showToast('Voorraad moet minimaal 1 zijn'); return; }
+
+  showLoading(true);
+  db.collection('users').doc(currentUser.uid).collection('flowers').add({
+    name, price, stock, emoji, color,
+    createdAt: firebase.firestore.FieldValue.serverTimestamp()
+  })
+  .then(() => {
+    showLoading(false);
+    closeModal('add-flower-modal');
+    showToast('Bloem toegevoegd!');
+  })
+  .catch(() => {
+    showLoading(false);
+    showToast('Fout bij toevoegen');
+  });
+}
+
+function deleteFlower(id) {
+  if (!confirm('Weet je zeker dat je deze bloem wilt verwijderen?')) return;
+  db.collection('users').doc(currentUser.uid).collection('flowers').doc(id).delete()
+    .then(() => showToast('Bloem verwijderd'))
+    .catch(() => showToast('Fout bij verwijderen'));
+}
+
+// ===================== MAP =====================
+const BEACH_COORDS = {
+  all: [51.1, 2.8],
+  panne: [51.1, 2.59],
+  koksijde: [51.12, 2.65],
+  nieuwpoort: [51.15, 2.72],
+  oostende: [51.23, 2.92],
+  blankenberge: [51.31, 3.13],
+  knokke: [51.34, 3.29]
+};
+
+function initMap() {
+  if (map) return;
+  const mc = document.getElementById('map-container');
+  if (!mc) return;
+  try {
+    map = L.map('map-container').setView([51.15, 2.8], 10);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '© OpenStreetMap', maxZoom: 18 }).addTo(map);
+    map.on('click', e => setShopLocation(e.latlng.lat, e.latlng.lng));
+    if (userData?.location?.lat && userData?.location?.lng) updateUserMarker(userData.location.lat, userData.location.lng);
+  } catch(e) { console.error('Map error:', e); }
+}
+
+function focusBeach(b) {
+  document.querySelectorAll('.beach-badge').forEach(x => x.classList.remove('active'));
+  event.target.classList.add('active');
+  if (!map) return;
+  const c = BEACH_COORDS[b] || BEACH_COORDS.all;
+  map.setView(c, b === 'all' ? 10 : 13);
+}
+
+function setShopLocation(lat, lng) {
+  if (!currentUser) return;
+  showLoading(true);
+  db.collection('users').doc(currentUser.uid).update({ 'location.lat': lat, 'location.lng': lng })
+    .then(() => { showLoading(false); showToast('Locatie ingesteld!'); updateUserMarker(lat, lng); })
+    .catch(() => { showLoading(false); showToast('Fout bij locatie'); });
+}
+
+function useGPS() {
+  if (!navigator.geolocation) { showToast('GPS niet beschikbaar'); return; }
+  showLoading(true);
+  navigator.geolocation.getCurrentPosition(
+    pos => {
+      const { latitude, longitude } = pos.coords;
+      setShopLocation(latitude, longitude);
+      if (map) map.setView([latitude, longitude], 15);
+    },
+    err => {
+      showLoading(false);
+      const msgs = { 1: 'GPS-toegang geweigerd', 2: 'GPS niet gevonden', 3: 'GPS timeout' };
+      showToast(msgs[err.code] || 'GPS fout');
+    },
+    { enableHighAccuracy: true, timeout: 15000 }
+  );
+}
+
+function updateUserMarker(lat, lng) {
+  if (!map) return;
+  if (userMarker) map.removeLayer(userMarker);
+  const status = userData?.status || 'closed';
+  const color = status === 'open' ? '#22c55e' : status === 'paused' ? '#eab308' : '#ef4444';
+  const icon = L.divIcon({
+    className: 'custom-marker',
+    html: `<div style="width:16px;height:16px;border-radius:50%;background:${color};border:2px solid white;box-shadow:0 1px 4px rgba(0,0,0,0.3);"></div>`,
+    iconSize: [16, 16], iconAnchor: [8, 8]
+  });
+  userMarker = L.marker([lat, lng], { icon }).addTo(map);
+}
+
+function updateShopMarkers() {
+  if (!map) return;
+  shopMarkers.forEach(m => map.removeLayer(m));
+  shopMarkers = [];
+
+  allSellers.forEach(s => {
+    if (!s.location?.lat || !s.location?.lng) return;
+    const status = s.status || 'closed';
+    const color = status === 'open' ? '#22c55e' : '#eab308';
+    const icon = L.divIcon({
+      className: 'custom-marker',
+      html: `<div style="width:12px;height:12px;border-radius:50%;background:${color};border:2px solid white;box-shadow:0 1px 4px rgba(0,0,0,0.3);"></div>`,
+      iconSize: [12, 12], iconAnchor: [6, 6]
+    });
+    const marker = L.marker([s.location.lat, s.location.lng], { icon }).addTo(map);
+    marker.bindPopup(`<div class="popup-title">${escapeHtml(s.name || 'Onbekend')}</div><div class="popup-status">${s.location.place || ''}</div><div class="popup-shells">${status === 'open' ? '🟢 Open' : '🟡 Pauze'}</div>`);
+    marker.on('click', () => openBuyModal(s.id));
+    shopMarkers.push(marker);
+  });
+
+  if (userData?.location?.lat && userData?.location?.lng) updateUserMarker(userData.location.lat, userData.location.lng);
+}
+
+function setShopStatus(status) {
+  if (!currentUser) return;
+  db.collection('users').doc(currentUser.uid).update({ status })
+    .then(() => { showToast(`Status: ${status === 'open' ? 'Open' : status === 'paused' ? 'Pauze' : 'Gesloten'}`); if (userData?.location?.lat) updateUserMarker(userData.location.lat, userData.location.lng); })
+    .catch(() => showToast('Fout bij status'));
+}
+
+// ===================== LOG =====================
+function renderTransactions() {
+  const list = document.getElementById('log-list');
+  if (transactions.length === 0) {
+    list.innerHTML = '<div class="empty-state"><svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg><div>Nog geen transacties</div></div>';
+    return;
+  }
+
+  list.innerHTML = transactions.map(t => {
+    const date = t.timestamp?.toDate ? t.timestamp.toDate().toLocaleString('nl-BE', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) : 'Zojuist';
+    const isPurchase = t.type === 'purchase';
+    const icon = isPurchase ? '🛒' : '💰';
+    const title = isPurchase ? `${escapeHtml(t.flowerName)} gekocht` : `${escapeHtml(t.flowerName)} verkocht`;
+    const extra = isPurchase ? `van ${escapeHtml(t.sellerName || 'verkoper')}` : `aan ${escapeHtml(t.buyerName || 'koper')}`;
+
+    return `
+      <div class="history-item">
+        <div class="history-icon" style="background:#fef3c7;">${icon}</div>
+        <div class="history-text">
+          <div class="history-title">${title}</div>
+          <div class="history-time">${extra} • ${date}</div>
+        </div>
+        <div class="history-amount ${isPurchase ? 'negative' : 'positive'}">${isPurchase ? '' : '+'}${t.amount}</div>
+      </div>
+    `;
+  }).join('');
+}
+
+// ===================== PROFILE =====================
+function showProfile() {
+  document.getElementById('main-app').style.display = 'none';
+  document.getElementById('profile-screen').style.display = 'block';
+}
+
+function hideProfile() {
+  document.getElementById('profile-screen').style.display = 'none';
+  document.getElementById('main-app').style.display = 'block';
+  if (map) setTimeout(() => map.invalidateSize(), 100);
+}
+
+function showEditName() {
+  document.getElementById('new-display-name').value = userData?.name || '';
+  document.getElementById('edit-name-modal').classList.add('show');
+}
+
+function confirmEditName() {
+  const name = document.getElementById('new-display-name').value.trim();
+  if (!name) { showToast('Vul een naam in'); return; }
+  showLoading(true);
+  Promise.all([
+    currentUser.updateProfile({ displayName: name }),
+    db.collection('users').doc(currentUser.uid).update({ name })
+  ]).then(() => { showLoading(false); closeModal('edit-name-modal'); showToast('Naam gewijzigd!'); })
+    .catch(() => { showLoading(false); showToast('Fout'); });
+}
+
+function showEditLocation() {
+  const loc = userData?.location || {};
+  document.getElementById('location-place').value = loc.place || '';
+  document.getElementById('location-ref').value = loc.ref || '';
+  document.getElementById('edit-location-modal').classList.add('show');
+}
+
+function confirmEditLocation() {
+  const place = document.getElementById('location-place').value.trim();
+  const ref = document.getElementById('location-ref').value.trim();
+  db.collection('users').doc(currentUser.uid).update({ 'location.place': place, 'location.ref': ref })
+    .then(() => { closeModal('edit-location-modal'); showToast('Locatie opgeslagen!'); })
+    .catch(() => showToast('Fout'));
+}
+
+function showEditShells() {
+  document.getElementById('new-shells-count').value = userData?.shells || 0;
+  document.getElementById('edit-shells-modal').classList.add('show');
+}
+
+function confirmEditShells() {
+  const shells = parseInt(document.getElementById('new-shells-count').value);
+  if (isNaN(shells) || shells < 0) { showToast('Ongeldig aantal'); return; }
+  db.collection('users').doc(currentUser.uid).update({ shells })
+    .then(() => { closeModal('edit-shells-modal'); showToast('Schelpen aangepast!'); })
+    .catch(() => showToast('Fout'));
+}
+
+// ===================== CLEANUP =====================
+window.addEventListener('beforeunload', () => {
+  if (unsubUser) unsubUser();
+  if (unsubFlowers) unsubFlowers();
+  if (unsubSellers) unsubSellers();
+  if (unsubTrans) unsubTrans();
+});
+</script>
+</div>
+</body>
+</html>
